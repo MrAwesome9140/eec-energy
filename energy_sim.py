@@ -140,6 +140,7 @@ def simulate(trace_file):
 
         total_access_time = 0
         total_memory_accesses = 0
+        total_memory_accesses_l2 = 0
         l1_misses = 0
         l2_misses = 0
         l1_hits = 0
@@ -161,6 +162,7 @@ def simulate(trace_file):
                     total_memory_accesses += 1
                     if not l1_cache.read(address):
                         l1_misses += 1
+                        total_memory_accesses_l2 += 1
                         if not l2_cache.read(address):
                             l2_misses += 1
                             l1_energy += l1_cache.idle_power * (dram.access_time - l1_cache.access_time) + l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * dram.access_time
@@ -186,6 +188,7 @@ def simulate(trace_file):
                     total_memory_accesses += 1
                     if not l1_cache.read(address):
                         l1_misses += 1
+                        total_memory_accesses_l2 += 1
                         if not l2_cache.read(address):
                             l2_misses += 1
                             l1_energy += l1_cache.idle_power * l2_cache_ind_access_time + l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * l2_cache.access_time
@@ -212,13 +215,14 @@ def simulate(trace_file):
         # Print out misses, hits, miss rate, and energy consumption
         print(f"Trace File: {trace_file}")
         print(f"Associativity: {associativity}")
-        # print(f"L1 Misses: {l1_misses}")
-        # print(f"L1 Hits: {l1_hits}")
+        print(f"L1 Misses: {l1_misses}")
+        print(f"L1 Hits: {l1_hits}")
         print(f"L1 Hit Rate: {l1_hits / total_memory_accesses}")
 
-        # print(f"L2 Misses: {l2_misses}")
-        # print(f"L2 Hits: {l2_hits}")
-        print(f"L2 Hit Rate: {l2_hits / total_memory_accesses}")
+        print(f"L2 Misses: {l2_misses}")
+        print(f"L2 Hits: {l2_hits}")
+        # print(f"L2 Hit Rate: {l2_hits / total_memory_accesses}")
+        print(f"L2 Hit Rate: {l2_hits / total_memory_accesses_l2}")
 
         print(f"L1 Energy Consumption: {l1_energy} pJ")
         print(f"L2 Energy Consumption: {l2_energy} pJ")
@@ -227,3 +231,4 @@ def simulate(trace_file):
 
 # Run the simulation
 simulate(".\\Traces\\Spec_Benchmark\\039.wave5.din")
+# simulate("/Users/anthony/eec-energy/039.wave5.din")
