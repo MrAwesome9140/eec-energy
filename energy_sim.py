@@ -203,6 +203,11 @@ def simulate(trace_file):
                             total_access_time += l2_cache.access_time
                     else:
                         l1_hits += 1
+
+                        # added these counts to reflect write through to L2
+                        total_memory_accesses_l2 += 1
+                        l2_hits += 1
+
                         l1_energy += l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * l2_cache_ind_access_time + l1_cache.idle_power * l2_cache.access_time
                         l2_energy += l2_cache.idle_power * l1_cache.access_time + l2_cache.active_power * l2_cache_ind_access_time
                         dram_energy += dram.idle_power * l2_cache.access_time
