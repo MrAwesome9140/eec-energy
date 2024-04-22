@@ -1,4 +1,6 @@
 import math
+import os
+from pathlib import Path
 import random
 
 # The Memory Subsystem
@@ -149,91 +151,98 @@ def simulate(trace_file):
         l2_energy = 0
         dram_energy = 0
 
-        with open(trace_file, 'r') as file:
-            for line in file:
-                operation, address, data = line.strip().split()
-                operation = int(operation)
-                address = int(address, 16)
-                data = int(data, 16)
+        for i in range(10):
+            with open(trace_file, 'r') as file:
+                for line in file:
+                    operation, address, data = line.strip().split()
+                    operation = int(operation)
+                    address = int(address, 16)
+                    data = int(data, 16)
 
-                l1_cache = l1_data_cache if operation == 0 or operation == 1 else l1_instruction_cache
-                
-                if operation == 0 or operation == 2:  # Data read or instruction fetch
-                    total_memory_accesses += 1
-                    if not l1_cache.read(address):
-                        l1_misses += 1
-                        total_memory_accesses_l2 += 1
-                        if not l2_cache.read(address):
-                            l2_misses += 1
-                            l1_energy += l1_cache.idle_power * (dram.access_time - l1_cache.access_time) + l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * dram.access_time
-                            l2_energy += l2_cache.active_power * l2_cache_ind_access_time + l2_cache.idle_power * (dram.access_time - l2_cache.access_time) + l2_transfer_penalty
-                            dram_energy += dram.active_power * dram_ind_access_time + dram.idle_power * l2_cache.access_time + dram_transfer_penalty
-                            total_access_time += dram.access_time
-                            l1_cache.write(address)
-                            l2_cache.write(address)
+                    l1_cache = l1_data_cache if operation == 0 or operation == 1 else l1_instruction_cache
+                    
+                    if operation == 0 or operation == 2:  # Data read or instruction fetch
+                        total_memory_accesses += 1
+                        if not l1_cache.read(address):
+                            l1_misses += 1
+                            total_memory_accesses_l2 += 1
+                            if not l2_cache.read(address):
+                                l2_misses += 1
+                                l1_energy += l1_cache.idle_power * (dram.access_time - l1_cache.access_time) + l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * dram.access_time
+                                l2_energy += l2_cache.active_power * l2_cache_ind_access_time + l2_cache.idle_power * (dram.access_time - l2_cache.access_time) + l2_transfer_penalty
+                                dram_energy += dram.active_power * dram_ind_access_time + dram.idle_power * l2_cache.access_time + dram_transfer_penalty
+                                total_access_time += dram.access_time
+                                l1_cache.write(address)
+                                l2_cache.write(address)
+                            else:
+                                l2_hits += 1
+                                l1_energy += l1_cache.idle_power * l2_cache_ind_access_time + l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * l2_cache.access_time
+                                l2_energy += l2_cache.active_power * l2_cache_ind_access_time + l2_cache.idle_power * l1_cache.access_time + l2_transfer_penalty
+                                dram_energy += dram.idle_power * l2_cache.access_time
+                                total_access_time += l2_cache.access_time
+                                l1_cache.write(address)
                         else:
+                            l1_hits += 1
+                            l1_energy += l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * l1_cache.access_time
+                            l2_energy += l2_cache.idle_power * l1_cache.access_time
+                            dram_energy += dram.idle_power * l1_cache.access_time
+                            total_access_time += l1_cache.access_time
+                    elif operation == 1:  # Data write
+                        total_memory_accesses += 1
+                        if not l1_cache.read(address):
+                            l1_misses += 1
+                            total_memory_accesses_l2 += 1
+                            if not l2_cache.read(address):
+                                l2_misses += 1
+                                l1_energy += l1_cache.idle_power * l2_cache_ind_access_time + l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * l2_cache.access_time
+                                dram_energy += dram.idle_power * l2_cache.access_time + dram_transfer_penalty
+                                total_access_time += l2_cache.access_time
+                                l2_cache.write(address)
+                            else:
+                                l2_hits += 1
+                                l1_energy += l1_cache.idle_power * l2_cache_ind_access_time + l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * l2_cache.access_time
+                                l2_energy += l2_cache.active_power * l2_cache_ind_access_time + l2_cache.idle_power * l1_cache.access_time
+                                dram_energy += dram.idle_power * l2_cache.access_time
+                                total_access_time += l2_cache.access_time
+                        else:
+                            l1_hits += 1
+
+                            # added these counts to reflect write through to L2
+                            total_memory_accesses_l2 += 1
                             l2_hits += 1
-                            l1_energy += l1_cache.idle_power * l2_cache_ind_access_time + l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * l2_cache.access_time
-                            l2_energy += l2_cache.active_power * l2_cache_ind_access_time + l2_cache.idle_power * l1_cache.access_time + l2_transfer_penalty
+
+                            l1_energy += l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * l2_cache_ind_access_time + l1_cache.idle_power * l2_cache.access_time
+                            l2_energy += l2_cache.idle_power * l1_cache.access_time + l2_cache.active_power * l2_cache_ind_access_time
                             dram_energy += dram.idle_power * l2_cache.access_time
                             total_access_time += l2_cache.access_time
                             l1_cache.write(address)
-                    else:
-                        l1_hits += 1
-                        l1_energy += l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * l1_cache.access_time
-                        l2_energy += l2_cache.idle_power * l1_cache.access_time
-                        dram_energy += dram.idle_power * l1_cache.access_time
-                        total_access_time += l1_cache.access_time
-                elif operation == 1:  # Data write
-                    total_memory_accesses += 1
-                    if not l1_cache.read(address):
-                        l1_misses += 1
-                        total_memory_accesses_l2 += 1
-                        if not l2_cache.read(address):
-                            l2_misses += 1
-                            l1_energy += l1_cache.idle_power * l2_cache_ind_access_time + l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * l2_cache.access_time
-                            dram_energy += dram.idle_power * l2_cache.access_time + dram_transfer_penalty
-                            total_access_time += l2_cache.access_time
                             l2_cache.write(address)
-                        else:
-                            l2_hits += 1
-                            l1_energy += l1_cache.idle_power * l2_cache_ind_access_time + l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * l2_cache.access_time
-                            l2_energy += l2_cache.active_power * l2_cache_ind_access_time + l2_cache.idle_power * l1_cache.access_time
-                            dram_energy += dram.idle_power * l2_cache.access_time
-                            total_access_time += l2_cache.access_time
-                    else:
-                        l1_hits += 1
-
-                        # added these counts to reflect write through to L2
-                        total_memory_accesses_l2 += 1
-                        l2_hits += 1
-
-                        l1_energy += l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * l2_cache_ind_access_time + l1_cache.idle_power * l2_cache.access_time
-                        l2_energy += l2_cache.idle_power * l1_cache.access_time + l2_cache.active_power * l2_cache_ind_access_time
-                        dram_energy += dram.idle_power * l2_cache.access_time
-                        total_access_time += l2_cache.access_time
-                        l1_cache.write(address)
-                        l2_cache.write(address)
 
         average_memory_access_time = total_access_time / total_memory_accesses
 
         # Print out misses, hits, miss rate, and energy consumption
         print(f"Trace File: {trace_file}")
         print(f"Associativity: {associativity}")
-        print(f"L1 Misses: {l1_misses}")
-        print(f"L1 Hits: {l1_hits}")
+        print(f"Average L1 Misses: {l1_misses / 10}")
+        print(f"Average L1 Hits: {l1_hits / 10}")
         print(f"L1 Hit Rate: {l1_hits / total_memory_accesses}")
 
-        print(f"L2 Misses: {l2_misses}")
-        print(f"L2 Hits: {l2_hits}")
+        print(f"Average L2 Misses: {l2_misses / 10}")
+        print(f"Average L2 Hits: {l2_hits / 10}")
         # print(f"L2 Hit Rate: {l2_hits / total_memory_accesses}")
-        print(f"L2 Hit Rate: {l2_hits / total_memory_accesses_l2}")
+        print(f"Average L2 Hit Rate: {l2_hits / total_memory_accesses_l2}")
 
-        print(f"L1 Energy Consumption: {l1_energy} pJ")
-        print(f"L2 Energy Consumption: {l2_energy} pJ")
-        print(f"DRAM Energy Consumption: {dram_energy} pJ")
+        print(f"Average L1 Energy Consumption: {l1_energy / 10} pJ")
+        print(f"Average L2 Energy Consumption: {l2_energy / 10} pJ")
+        print(f"Average DRAM Energy Consumption: {dram_energy / 10} pJ")
         print(f"Average Memory Access Time: {average_memory_access_time} ns\n")
 
 # Run the simulation
-simulate(".\\Traces\\Spec_Benchmark\\039.wave5.din")
+folder = Path(".\\Traces\\Spec_Benchmark")
+for i in folder.iterdir():
+    if i.is_file() and i.suffix == ".din":            
+        simulate(".\\Traces\\Spec_Benchmark\\" + i.name)
+        print("\n")
+
+# simulate(".\\Traces\\Spec_Benchmark\\039.wave5.din")
 # simulate("/Users/anthony/eec-energy/039.wave5.din")
