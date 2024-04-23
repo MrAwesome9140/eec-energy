@@ -1,5 +1,5 @@
 import math
-import os
+import sys
 from pathlib import Path
 import random
 
@@ -126,7 +126,7 @@ class Memory:
     def write(self, address):
         return True
 
-def simulate(trace_file):
+def simulate(trace_file, num_runs):
 
     for associativity in [2, 4, 8]:
         l2_cache = Cache(256 * (2 ** 10), associativity, 5, 0.8, 2)
@@ -151,7 +151,7 @@ def simulate(trace_file):
         l2_energy = 0
         dram_energy = 0
 
-        for i in range(10):
+        for i in range(num_runs):
             with open(trace_file, 'r') as file:
                 for line in file:
                     operation, address, data = line.strip().split()
@@ -225,7 +225,7 @@ def simulate(trace_file):
         print(f"Associativity: {associativity}")
         print(f"Average L1 Misses: {l1_misses / 10}")
         print(f"Average L1 Hits: {l1_hits / 10}")
-        print(f"L1 Hit Rate: {l1_hits / total_memory_accesses}")
+        print(f"Average L1 Hit Rate: {l1_hits / total_memory_accesses}")
 
         print(f"Average L2 Misses: {l2_misses / 10}")
         print(f"Average L2 Hits: {l2_hits / 10}")
@@ -238,11 +238,15 @@ def simulate(trace_file):
         print(f"Average Memory Access Time: {average_memory_access_time} ns\n")
 
 # Run the simulation
-folder = Path(".\\Traces\\Spec_Benchmark")
-for i in folder.iterdir():
-    if i.is_file() and i.suffix == ".din":            
-        simulate(".\\Traces\\Spec_Benchmark\\" + i.name)
-        print("\n")
-
-# simulate(".\\Traces\\Spec_Benchmark\\039.wave5.din")
-# simulate("/Users/anthony/eec-energy/039.wave5.din")
+num_runs = int(sys.argv[1]) if len(sys.argv) > 1 else 10
+specified_trace_file = sys.argv[2] if len(sys.argv) > 2 else None
+print(f"Number of Runs: {num_runs}")
+print(f"Specified Trace File: {specified_trace_file}\n")
+if specified_trace_file:
+    simulate("./Traces/Spec_Benchmark/" + specified_trace_file, num_runs)
+else:
+    folder = Path("./Traces/Spec_Benchmark")
+    for i in folder.iterdir():
+        if i.is_file() and i.suffix == ".din":            
+            simulate("./Traces/Spec_Benchmark/" + i.name, num_runs)
+            print("\n")
