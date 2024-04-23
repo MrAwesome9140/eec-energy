@@ -50,23 +50,30 @@ class Cache:
 
         return False
 
+    # returns True if we need to write back from L2 to DRAM, returns False otherwise
     def write(self, address):
         set_index = (address // 64) % (self.size // (self.associativity * 64))
         tag = address // (self.size // (self.associativity * 64) * 64)
 
-        random_index = random.randint(0, self.associativity - 1)
-        evict = self.cache[set_index][random_index]
-        if self.parent and evict.valid and evict.dirty:
-            self.parent.write(evict.tag)
-        
-        self.cache[set_index][random_index].tag = tag
-        self.cache[set_index][random_index].valid = True
-
-        if not self.associativity == 1:
-            # when writing to L2 set the dirty bit
-            self.cache[set_index][random_index].dirty = True
+        if self.associativity != 1 and self.read(address):
+            # block already in L2, overwrite and set dirty bit
+            for i in range(self.associativity):
+                temp = self.cache[set_index][i]
+                if temp.tag == tag and temp.valid:
+                    self.cache[set_index][i].dirty = True
+                    return False
         else:
+            # block not in cache, need to perform eviction
+            random_index = random.randint(0, self.associativity - 1)
+            evict = self.cache[set_index][random_index]
+            self.cache[set_index][random_index].tag = tag
+            self.cache[set_index][random_index].valid = True
             self.cache[set_index][random_index].dirty = False
+            if self.associativity != 1 and evict.valid and evict.dirty:
+                # need to write this block back to DRAM
+                return True
+        return False
+
 
 """
 Represents a memory module.
@@ -140,7 +147,9 @@ def simulate(trace_file, num_runs):
                                 dram_energy += dram.active_power * dram_ind_access_time + dram.idle_power * l2_cache.access_time + dram_transfer_penalty
                                 total_access_time += dram.access_time
                                 l1_cache.write(address)
-                                l2_cache.write(address)
+                                if l2_cache.write(address):
+                                    # add energy used for async writeback to DRAM
+                                    dram_energy += dram.active_power * dram_ind_access_time + dram_transfer_penalty
                             else:
                                 l2_hits += 1
                                 l1_energy += l1_cache.idle_power * l2_cache_ind_access_time + l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * l2_cache.access_time
@@ -148,6 +157,9 @@ def simulate(trace_file, num_runs):
                                 dram_energy += dram.idle_power * l2_cache.access_time
                                 total_access_time += l2_cache.access_time
                                 l1_cache.write(address)
+                                if l2_cache.write(address):
+                                    # add energy used for async writeback to DRAM
+                                    dram_energy += dram.active_power * dram_ind_access_time + dram_transfer_penalty
                         else:
                             l1_hits += 1
                             l1_energy += l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * l1_cache.access_time
@@ -164,13 +176,19 @@ def simulate(trace_file, num_runs):
                                 l1_energy += l1_cache.idle_power * l2_cache_ind_access_time + l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * l2_cache.access_time
                                 dram_energy += dram.idle_power * l2_cache.access_time + dram_transfer_penalty
                                 total_access_time += l2_cache.access_time
-                                l2_cache.write(address)
+                                l1_cache.write(address)
+                                if l2_cache.write(address):
+                                    # add energy used for async writeback to DRAM
+                                    dram_energy += dram.active_power * dram_ind_access_time + dram_transfer_penalty
                             else:
                                 l2_hits += 1
                                 l1_energy += l1_cache.idle_power * l2_cache_ind_access_time + l1_cache.active_power * l1_cache.access_time + l1_cache.idle_power * l2_cache.access_time
                                 l2_energy += l2_cache.active_power * l2_cache_ind_access_time + l2_cache.idle_power * l1_cache.access_time
                                 dram_energy += dram.idle_power * l2_cache.access_time
                                 total_access_time += l2_cache.access_time
+                                if l2_cache.write(address):
+                                    # add energy used for async writeback to DRAM
+                                    dram_energy += dram.active_power * dram_ind_access_time + dram_transfer_penalty
                         else:
                             l1_hits += 1
 
@@ -183,7 +201,9 @@ def simulate(trace_file, num_runs):
                             dram_energy += dram.idle_power * l2_cache.access_time
                             total_access_time += l2_cache.access_time
                             l1_cache.write(address)
-                            l2_cache.write(address)
+                            if l2_cache.write(address):
+                                # add energy used for async writeback to DRAM
+                                dram_energy += dram.active_power * dram_ind_access_time + dram_transfer_penalty
 
         average_memory_access_time = total_access_time / total_memory_accesses
 
